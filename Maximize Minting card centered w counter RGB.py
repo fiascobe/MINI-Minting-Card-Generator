@@ -8,7 +8,7 @@ from reportlab.lib.pagesizes import A4
 
 # ==============================================================================
 # PART 1: QR Code Generation and Merging
-# (This part is unchanged)
+# (This part is MODIFIED)
 # ==============================================================================
 
 def get_last_6_alphanum(url):
@@ -28,8 +28,8 @@ def generate_qr(url, counter, output_dir):
     qr.make(fit=True)
     img = qr.make_image(fill_color="black", back_color="white").convert('RGB')
 
-    # Resize the QR
-    img = img.resize((294, 294), Image.LANCZOS)
+    # --- MODIFIED: Resize the QR to 210x210 ---
+    img = img.resize((210, 210), Image.LANCZOS)
 
     # Generate unique filename with counter and last 6 alphanum chars
     suffix = get_last_6_alphanum(url)
@@ -56,21 +56,18 @@ def merge_images_inside(image_outer_path, qr_codes_folder, output_folder, base_f
     merged_image_paths = []
 
     # --- START: SORTING FIX ---
-    # 1. Get only the relevant QR code files
+    # (Unchanged)
     qr_files = [f for f in os.listdir(qr_codes_folder) if f.startswith("QR_") and f.endswith(".png")]
 
-    # 2. Define a function that extracts the number from the filename
     def get_file_number(filename):
         match = re.search(r'QR_(\d+)_', filename)
         if match:
             return int(match.group(1))
-        return 0 # Default value if no number is found
+        return 0 
 
-    # 3. Sort the list of files using the number we extracted as the key
     sorted_qr_files = sorted(qr_files, key=get_file_number)
     # --- END: SORTING FIX ---
 
-    # Now, loop through the correctly sorted list
     for i, filename in enumerate(sorted_qr_files, start=1):
         qr_filepath = os.path.join(qr_codes_folder, filename)
         image_inner = Image.open(qr_filepath).convert("RGB")
@@ -78,8 +75,14 @@ def merge_images_inside(image_outer_path, qr_codes_folder, output_folder, base_f
         match = re.search(r'QR_\d+_([A-Za-z0-9]{6})\.png', filename)
         code = match.group(1) if match else "######"
 
-        paste_position = (10, 10)
-        qr_x, qr_y = paste_position
+        # --- MODIFIED: Center the QR code ---
+        # Calculate QR paste position for centering
+        outer_width, outer_height = image_outer.size
+        inner_width, inner_height = image_inner.size
+        qr_x = (outer_width - inner_width) // 2
+        qr_y = ((outer_height - inner_height) // 2) + 10
+        paste_position = (qr_x, qr_y)
+        # --- END MODIFICATION ---
 
         image_combined = image_outer.copy()
         image_combined.paste(image_inner, paste_position)
@@ -90,28 +93,28 @@ def merge_images_inside(image_outer_path, qr_codes_folder, output_folder, base_f
         text = code
         bbox = draw.textbbox((0, 0), text, font=font)
         text_width = bbox[2] - bbox[0]
+        # Center horizontally under the QR
         text_x = qr_x + (image_inner.width - text_width) // 2
-        text_y = qr_y + image_inner.height + 45
+        # --- MODIFIED: Position 60px down from QR bottom ---
+        text_y = qr_y + image_inner.height + 50
         draw.text((text_x, text_y), text, font=font, fill="black")
 
-        # --- Add Counter ---
+        # --- MODIFIED: Add Counter based on new pixel coordinates ---
         counter_text = str(i)
-        counter_color = "#da2c3d"
-        dpi = 300
-        y_offset_mm = 5
-        
-        y_offset_px = y_offset_mm * (dpi / 25.4)
-        
-        img_width, img_height = image_combined.size
+        counter_color = "#ccc8e4"
 
+        # Get counter text bounding box
         counter_bbox = draw.textbbox((0, 0), counter_text, font=counter_font)
         counter_text_width = counter_bbox[2] - counter_bbox[0]
-        counter_text_height = counter_bbox[3] - counter_bbox[1]
-
-        counter_x = (img_width - counter_text_width) / 2
-        counter_y = img_height - y_offset_px - counter_text_height
+        
+        # Calculate horizontal position (centered under QR)
+        counter_x = qr_x + (image_inner.width - counter_text_width) // 2
+        
+        # Calculate vertical position (175px from QR bottom)
+        counter_y = qr_y + image_inner.height + 160
 
         draw.text((counter_x, counter_y), counter_text, font=counter_font, fill=counter_color)
+        # --- END MODIFICATION ---
 
         # The rest of the function remains the same
         original_counter_match = re.search(r'QR_(\d+)_', filename)
@@ -127,7 +130,7 @@ def merge_images_inside(image_outer_path, qr_codes_folder, output_folder, base_f
     return merged_image_paths
 
 # ==============================================================================
-# PART 2: PDF Layout and Creation (MODIFIED)
+# PART 2: PDF Layout and Creation (Unchanged)
 # ==============================================================================
 
 def create_pdf_from_images(images, output_pdf):
