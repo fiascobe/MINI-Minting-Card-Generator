@@ -5,6 +5,7 @@ import qrcode
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
 from reportlab.lib.pagesizes import A4
+import math  # <-- NEW: Import math for ceiling function
 
 # ==============================================================================
 # PART 1: QR Code Generation and Merging
@@ -130,12 +131,51 @@ def merge_images_inside(image_outer_path, qr_codes_folder, output_folder, base_f
     return merged_image_paths
 
 # ==============================================================================
-# PART 2: PDF Layout and Creation (Unchanged)
+# NEW HELPER FUNCTION FOR PAGE NUMBERING
+# ==============================================================================
+
+# ==============================================================================
+# NEW HELPER FUNCTION FOR PAGE NUMBERING (MODIFIED)
+# ==============================================================================
+
+def draw_page_number(c, page_num, total_pages):
+    """
+    Draws just the page number (e.g., "1") in the bottom right corner.
+    """
+    # Get the page dimensions from the canvas
+    page_width, page_height = c._pagesize
+    
+    # --- MODIFIED: Set the text to be only the page number ---
+    text = str(page_num)
+    
+    # --- MODIFIED: Set font and smaller size (7) ---
+    c.setFont("Helvetica", 7)
+    
+    # Define margins from the edge (10mm from bottom, 10mm from right)
+    x_margin = 10 * mm
+    y_margin = 10 * mm
+    
+    # Calculate the X and Y coordinates
+    # X: page width - right margin
+    # Y: bottom margin
+    x = page_width - x_margin
+    y = y_margin
+    
+    # Draw the string, right-aligned, at the (x, y) position
+    c.drawRightString(x, y, text)
+
+# ==============================================================================
+# PART 2: PDF Layout and Creation (MODIFIED FOR PAGE COUNT)
+# ==============================================================================
+
+# ==============================================================================
+# PART 2: PDF Layout and Creation (MODIFIED FOR PAGE COUNT)
 # ==============================================================================
 
 def create_pdf_from_images(images, output_pdf):
     """
-    Lays out merged images onto an A4 PDF using the maximized grid logic.
+    Lays out merged images onto an A4 PDF using the maximized grid logic
+    and adds a 'Page X of Y' counter.
     """
     # --- Configuration (MODIFIED) ---
     # Set to match the maximized cut script
@@ -179,11 +219,31 @@ def create_pdf_from_images(images, output_pdf):
 
     c = canvas.Canvas(output_pdf, pagesize=A4)
     cards_per_page = cards_per_row * cards_per_col
+
+    # --- NEW: Page Counter Logic ---
+    total_images = len(images)
+    if total_images == 0:
+        total_pages = 1 # Always show at least one page
+    else:
+        # Calculate total pages using ceiling division
+        total_pages = (total_images + cards_per_page - 1) // cards_per_page
+    
+    current_page = 1
+    # --- END: Page Counter Logic ---
+
     temp_files_to_clean = []
 
     for i, img_path in enumerate(images):
         if i % cards_per_page == 0 and i != 0:
+            # --- NEW: Draw page number on the page we just finished ---
+            draw_page_number(c, current_page, total_pages)
+            # --- END: New ---
+            
             c.showPage()
+            
+            # --- NEW: Increment page counter ---
+            current_page += 1
+            # --- END: New ---
 
         row = (i % cards_per_page) // cards_per_row
         col = (i % cards_per_page) % cards_per_row
@@ -217,6 +277,10 @@ def create_pdf_from_images(images, output_pdf):
         # Draw the image on the canvas at the calculated x, y
         c.drawImage(temp_path, x, y, width=card_width, height=card_height)
         # No crop marks are drawn
+
+    # --- NEW: Draw page number on the *final* page ---
+    draw_page_number(c, current_page, total_pages)
+    # --- END: New ---
 
     c.save()
     for temp_file in temp_files_to_clean:
